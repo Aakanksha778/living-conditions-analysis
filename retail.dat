@@ -1,0 +1,39 @@
+# Load necessary library
+library(tidyverse)
+
+'
+# Load the dataset
+quality_of_life <- read_csv("Quality_of_Life.csv")
+
+# Print column names to check the correct names
+print(colnames(quality_of_life))
+
+# Define the columns to remove
+columns_to_remove <- c(
+  "climate_value",
+  "climate_category",
+  "property_price_to_income_value",
+  "property_price_to_income_category",
+  "traffic_commute_time_value",
+  "traffic_commute_time_category"
+)
+
+# Keep only existing columns in the dataset
+existing_columns <- intersect(columns_to_remove, colnames(quality_of_life))
+
+# Remove only those columns that exist
+quality_of_life <- quality_of_life %>% select(-all_of(existing_columns))
+
+# Remove duplicate rows
+quality_of_life <- quality_of_life %>% distinct()
+
+# Save cleaned dataset
+write_csv(quality_of_life, "Quality_of_Life_Cleaned.csv")
+
+# Print column names to check if the correct columns have been removed
+print(colnames(quality_of_life))
+'
+
+quality_of_life <- read_csv("Quality_of_Life_Cleaned.csv")
+
+print(colnames(quality_of_life))

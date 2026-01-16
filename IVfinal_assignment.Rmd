@@ -1,0 +1,320 @@
+---
+title: "Living Conditions Around the World: A Visual Exploration of Quality of Life"
+author: "Aakanksha Parekh, 100871641"
+date: "`r Sys.Date()`"
+output: html_document
+  
+# This is my final assignment for the course of Information Visualization with Dr. Steven Livingstone.
+# Due Date: April 2, 2025 @ 5:00 p.m.
+---
+
+## **Introduction**
+
+We all have different definitions of what makes life “good.” For some, it’s safety and clean air. For others, it’s affordable housing or access to quality healthcare. But how do these ideas stack up globally? What do we really know about the quality of life in different countries?
+
+In this project, I explored a dataset called `quality_of_life.csv`, which brings together various indicators like safety, pollution, cost of living, and healthcare for countries around the world. My goal wasn’t just to make fancy graphs — I wanted to see what stories the data would tell. Through seven very different types of visualizations, I tried to unpack how these factors interact and what that says about how we live.
+
+
+This dataset was chosen because it offers a comprehensive look at global living standards, making it an excellent resource for identifying trends and relationships between different quality of life factors. The goal of this analysis is to explore how these indicators are distributed and interconnected, using a range of visualizations to uncover meaningful insights.
+
+The report presents several visualizations that highlight different aspects of quality of life. A bar graph showcases the top 10 safest countries, revealing that smaller or well-governed nations tend to rank highest in safety. A box plot comparing health, safety, and pollution scores suggests that countries with higher safety levels often have better healthcare and lower pollution. A quasirandom scatter plot examines purchasing power, showing that economic strength is concentrated in nations with robust financial systems.
+
+A donut chart categorizes global pollution levels, emphasizing that most countries fall within the "High" or "Moderate" pollution brackets, raising concerns about environmental sustainability. A heatmap reveals how various quality-of-life factors are interconnected, demonstrating that improved safety and healthcare generally align with higher living standards. A lollipop graph highlights the cost of living in different countries, suggesting that nations with lower living costs often have smaller populations, typically being islands. Finally, a choropleth map provides a global perspective, visually illustrating quality of life distribution and highlighting regional disparities.
+
+Together, these visualizations answer key questions: Which countries excel in different aspects of quality of life? What factors are most interconnected? How do economic and environmental conditions shape global living standards? The findings reveal that quality of life is not defined by a single factor but rather by a combination of safety, healthcare, affordability, and environmental conditions. Through this project, we gain a clearer understanding of global living conditions and the challenges different regions face in maintaining high living standards.
+
+
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)  
+library(readr)      
+library(ggplot2)    
+library(sf)
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(networkD3)
+library(ggpattern)
+library(hrbrthemes)
+library(viridis)
+library(ggbeeswarm)
+library(pheatmap)
+library(pheatmap)
+```
+
+```{r load-data}
+# Load the dataset
+quality_of_life <- read_csv("Quality_of_Life.csv")
+print(colnames(quality_of_life))
+```
+```{r clean-data}
+# # Just how I cleaned my data
+# # Load necessary library
+# 
+# 
+# # Load the dataset
+# quality_of_life <- read_csv("Quality_of_Life.csv")
+# 
+# # Print column names to check the correct names
+# print(colnames(quality_of_life))
+# 
+# # Define the columns to remove
+# columns_to_remove <- c(
+#   "climate_value",
+#   "climate_category",
+#   "property_price_to_income_value",
+#   "property_price_to_income_category",
+#   "traffic_commute_time_value",
+#   "traffic_commute_time_category"
+# )
+# 
+# # Keep only existing columns in the dataset
+# existing_columns <- intersect(columns_to_remove, colnames(quality_of_life))
+# 
+# # Remove only those columns that exist
+# quality_of_life <- quality_of_life %>% select(-all_of(existing_columns))
+# 
+# # Remove duplicate rows
+# quality_of_life <- quality_of_life %>% distinct()
+# 
+# # Save cleaned dataset
+# write_csv(quality_of_life, "Quality_of_Life_Cleaned.csv")
+# 
+# # Print column names to check if the correct columns have been removed
+# print(colnames(quality_of_life))
+# '
+# 
+# quality_of_life <- read_csv("Quality_of_Life_Cleaned.csv")
+# 
+# print(colnames(quality_of_life))
+# 
+
+```
+
+## **Data Visualizations**
+
+### **1. Top 10 Countries for Safety (Bar Graph)**
+```{r safety-bar}
+
+# Top 10 safest countries (selected by greatest safety value/score)
+top_10_safest <- quality_of_life %>%
+  arrange(desc(`Safety Value`)) %>%
+  slice_head(n = 10)
+
+# Create the bar plot with patterns
+#inspired from R Graph Gallery (listed in References)
+ggplot(top_10_safest, aes(x = reorder(country, `Safety Value`), y = `Safety Value`, fill = `Safety Value`, pattern = country)) +
+  geom_bar_pattern(
+    stat = "identity",
+    pattern = "crosshatch",
+    pattern_density = 0.05,
+    pattern_spacing = 0.02,
+    pattern_fill = "white",
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_fill_viridis_d() +
+  labs(
+    title = "Top 10 Safest Countries across the World",
+    x = "Country",
+    y = "Safety Score"
+  ) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  theme_bw(base_size = 14)  
+
+```
+
+**What we learn:**
+The safest countries tend to be ones with smaller populations or strong institutions. As we see on this bar graph, Saint Pierre and Miquelon, Montserrat, and Saint Helena top the list due to their smaller populations.
+
+### **2. Health, Safety, and Pollution - Can a country thrive in all 3? (Box Plot Comparison)**
+```{r heal-saf-poll-boxplot}
+
+#Prep the data
+health_val<- quality_of_life$`Health Care Value`
+safety_val <- quality_of_life$`Safety Value`
+poll_val <- quality_of_life$`Pollution Value`
+
+# generate normal distribution with same mean and sd
+# got this bit of code from R Graph Gallery (listed below for references)
+health_norm <- rnorm(200,mean=mean(health_val, na.rm=TRUE), sd=sd(health_val, na.rm=TRUE))
+
+safety_norm <- rnorm(200,mean=mean(safety_val, na.rm=TRUE), sd=sd(safety_val, na.rm=TRUE))
+
+poll_norm <- rnorm(200,mean=mean(poll_val, na.rm=TRUE), sd=sd(poll_val, na.rm=TRUE))
+
+#Plot
+boxplot(health_val, health_norm, safety_val, safety_norm, poll_val, poll_norm,
+        
+        main = "Health, Safety and Pollution Comparision",
+        at = c(1,2,3,4,5,6),
+        names = c("Health Score", "Normal", "Safety Score", "Normal", "Pollution Score" , "Normal"),
+        las = 2,
+        col = rep(c("pink", "purple"), 3),
+        border = "blue",
+        horizontal = TRUE,
+        notch = TRUE)
+```
+
+**What we learn:**
+There’s a clear flow, indicating that higher safety levels often go hand-in-hand with better overall quality of life.It can be noted that countries that keep their citizens safe, also tend to offer better conditions in other areas too. 
+
+
+### **3. Who has the Purchasing Throne? Analyzing Purchasing Power across the World (Quasirandom Scatter Plot)**
+```{r purchasing-power}
+
+# Top 20 countries with highest Purchasing Power Value
+top_20 <- quality_of_life %>%
+  arrange(desc(`Purchasing Power Value`)) %>%
+  slice_head(n = 20) 
+ggplot(top_20, aes(x = reorder(country, `Purchasing Power Value`), 
+                    y = `Purchasing Power Value`, 
+                    color = country)) +  
+  #Plot
+  geom_quasirandom(size = 4, width = 0.2) +  
+  coord_flip() +  
+  labs(title = "Purchasing Power of Top 20 Countries",
+       x = "Country", 
+       y = "Purchasing Power Value") +
+  theme_minimal() +
+  theme(legend.position = "none")  
+
+```
+ 
+ **What we learn:**
+There’s a clear logarithmic pattern to the graph. This is interesting to  note. Very evidently the powerful countries made the top 20 list.
+
+### **4. Pollution (Donuts/Pie Chart)**
+```{r pollution-pie}
+
+poll_categories <- quality_of_life %>% 
+  count(`Pollution Category`) %>%
+  # Calculate % number
+  mutate(percentage = n / sum(n) * 100)  
+  
+# Donut design inspired from R Graph Gallery (referenced below)
+ggplot(poll_categories, aes(x = 1, y = n, fill = `Pollution Category`)) +
+  geom_bar(stat = "identity", width = 0.4) +  
+  coord_polar(theta = "y", start = 0) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), 
+            color = "white", size = 3) +  
+  labs(title = "Pollution Categories") +
+  theme_void() +  
+  theme(legend.position = "right") +  
+  xlim(0.5, 1.5)  # Creates the hole in the center (donut chart)
+
+```
+
+**What we learn:**
+Most countries land in the "High" or "Moderate" Pollution bracket. Very few reach the "Very low" category — and that makes us think: what are doing to help redue pollution as a whole? This chart helps out into perspective how harmful pollution is and how many counties are actively suffering from it.
+
+### **5. Analyzing all Areas that factor for a Good Quality life (Heatmap)**
+```{r all-values-heatmap}
+#We will analyze all the factors that make up a good quality life, like Cost of living, Purchasing power, Health Care, Safety and Pollution.
+
+quality_of_life_numeric <- quality_of_life[, sapply(quality_of_life, is.numeric)]
+
+cor_matrix <- cor(quality_of_life_numeric, use = "complete.obs")
+
+#Inspired from R Graph Gallery (is referenced in references section)
+pheatmap(cor_matrix, 
+         display_numbers = TRUE,   
+         number_format = "%.2f",   
+         fontsize_number = 10,     
+         fontsize_row = 10,        
+         fontsize_col = 10,        
+         cellwidth = 30,           
+         cellheight = 30)          
+
+```
+
+**What we learn:**
+There’s a clear linkage to all factors being inter-linked. Good safety accounts for good health and vice versa. Less pollution accounts for better life quality and health. All these factors play a key role in making quality of life greater as a whole, we cannot single out any one factor as they all essential. 
+
+### **6. Top 10 Countries by Cost of Living (Lollipop Graph)**
+```{r cost-of-living-lollipop}
+
+# Top 20 countries by Purchasing Power Value
+top_20_cost_of_living <- quality_of_life %>%
+  select(country, `Cost of Living Value`) %>%  
+  arrange(desc(`Cost of Living Value`)) %>%
+  slice_head(n = 20)
+
+#Stem design is inspired from R Graph Gallery (referenced below)
+ggplot(top_20_cost_of_living, aes(x = `Cost of Living Value`, y = reorder(country, `Cost of Living Value`))) +
+  geom_segment(aes(x = 0, xend = `Cost of Living Value`, y = country, yend = country), 
+               size = 1, color = "purple", linetype = "dotdash") +  
+  geom_point(color = "yellow", size = 5) +  
+  theme_minimal() +
+  labs(title = "Top 20 Countries by Cost of Living",
+       x = "Cost of Living Score",
+       y = "Country") +
+  theme(panel.grid.major.y = element_blank()) 
+
+```
+
+**What we learn:**
+Evidently as of now one the biggest global crisis is cost of living, the lesser the cost, the happier the population. Most of the countries that have a lower cost of living have a lower popular because they are islands. 
+
+### **7. A Global View of Wellbeing (Choropleth Map)**
+```{r quality-life-map}
+
+quality_of_life <- read.csv("Quality_of_Life.csv", stringsAsFactors = FALSE) 
+# Clean data
+quality_of_life$Quality.of.Life.Category <- trimws(gsub("'", "", quality_of_life$Quality.of.Life.Category))
+quality_of_life$Quality.of.Life.Category[is.na(quality_of_life$Quality.of.Life.Category) | quality_of_life$Quality.of.Life.Category == ""] <- "Unknown"
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+world_data <- left_join(world, quality_of_life, by = c("name" = "country"))
+
+# Plot
+ggplot(world_data) +
+  geom_sf(aes(fill = Quality.of.Life.Category), color = "white", size = 0.1) +
+  scale_fill_manual(
+    values = c(
+      "Very Low" = "red",
+      "Low" = "orange",
+      "Moderate" = "yellow",
+      "High" = "lightgreen",
+      "Very High" = "green",
+      "Unknown" = "gray"
+    ),
+    na.value = "gray"
+  ) +
+  theme_minimal() +
+  labs(
+    title = "Quality of Life Category by Country",
+    fill = "Quality of Life"
+  )
+```
+
+**What we learn:**
+High quality of life is concentrated in the Global North — places like Western Europe, Canada, Australia. Many countries in Africa and Asia are still struggling with basic Quality of life needs.
+
+## **Conclusion**
+
+Looking at this dataset through visual storytelling gave me more than just numbers, it shows real-life differences in how people live across the globe. The chloropleth map helped me see geographic inequality at a glance. The pie and heatmap broke down category distributions clearly. 
+
+Some questions I was prompted with was Why are some regions thriving while others are stuck in “Very Low” categories? What policies or histories have shaped these outcomes?
+
+This was more of reminder that the numbers we analyze are reflections of real lives.
+
+## **References**
+
+-   Kaggle Dataset: <https://www.kaggle.com/datasets/ahmedmohamed2003/quality-of-life-for-each-country?resource=download>
+
+- R Graph Gallery List: 
+- Bar Graph Design --> <https://r-graph-gallery.com/368-black-and-white-barchart.html> 
+- Pie/ Donut Chart --> <https://r-graph-gallery.com/doughnut-plot.html>
+- Lollipop Graph --> <https://r-graph-gallery.com/301-custom-lollipop-chart.html#stem>
+- Heatmap --> <https://r-graph-gallery.com/heatmap>
+- Chlropeth Map --> <https://r-graph-gallery.com/327-chloropleth-map-from-geojson-with-ggplot2.html>
+- Box Plot --> <https://r-graph-gallery.com/boxplot.html>
+- Scatter Plot --> <https://r-graph-gallery.com/370-basic-beeswarm-plot.html>
+
